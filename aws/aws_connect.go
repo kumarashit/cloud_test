@@ -6,6 +6,7 @@ import (
     "github.com/aws/aws-sdk-go/aws/credentials"
     "github.com/aws/aws-sdk-go/aws/awserr"
     "fmt"
+    "github.com/aws/aws-sdk-go/service/efs"
 )
 
 // Function to Create AWS EBS Volume
@@ -124,4 +125,90 @@ func CreateSession(region, ak, sk string) (*ec2.EC2) {
     }
     ec2Instance := ec2.New(sess)
     return ec2Instance
+}
+
+func CreateEFSSession(region, ak, sk string) (*efs.EFS) {
+    mySession := session.Must(session.NewSession(&aws.Config{
+            Region: aws.String(region),
+            Credentials: credentials.NewStaticCredentials(ak, sk, ""),
+    }))
+
+    // Create a EFS client from just a session.
+    svc := efs.New(mySession)
+    return svc
+}
+
+// Create a FS with the given name
+func CreateEFS(efsInstance *efs.EFS, fsname string) {
+    input := &efs.CreateFileSystemInput{
+             CreationToken:   aws.String("tokenstring"),
+             PerformanceMode: aws.String("generalPurpose"),
+             Tags: []*efs.Tag{
+                 {
+                 Key:   aws.String("Name"),
+                 Value: aws.String(fsname),
+                   },
+                 },
+             }
+    result, err := efsInstance.CreateFileSystem(input)
+    if err != nil {
+        if aerr, ok := err.(awserr.Error); ok {
+             switch aerr.Code() {
+             case efs.ErrCodeBadRequest:
+                fmt.Println(efs.ErrCodeBadRequest, aerr.Error())
+             case efs.ErrCodeInternalServerError:
+                fmt.Println(efs.ErrCodeInternalServerError, aerr.Error())
+             case efs.ErrCodeFileSystemAlreadyExists:
+                fmt.Println(efs.ErrCodeFileSystemAlreadyExists, aerr.Error())
+             case efs.ErrCodeFileSystemLimitExceeded:
+                fmt.Println(efs.ErrCodeFileSystemLimitExceeded, aerr.Error())
+             case efs.ErrCodeInsufficientThroughputCapacity:
+                fmt.Println(efs.ErrCodeInsufficientThroughputCapacity, aerr.Error())
+             case efs.ErrCodeThroughputLimitExceeded:
+                fmt.Println(efs.ErrCodeThroughputLimitExceeded, aerr.Error())
+             default:
+                fmt.Println(aerr.Error())
+            }
+         } else {
+            // Print the error, cast err to awserr.Error to get the Code and
+            // Message from an error.
+            fmt.Println(err.Error())
+        }
+        return
+    }
+
+    fmt.Println(result)
+
+}
+
+// Delete a EFS with the ID
+func DeleteEFS(efsInstance *efs.EFS, fsid string) {
+    input := &efs.DeleteFileSystemInput{
+                 FileSystemId: aws.String(fsid),
+             }
+
+    result, err := efsInstance.DeleteFileSystem(input)
+    if err != nil {
+	    if aerr, ok := err.(awserr.Error); ok {
+		    switch aerr.Code() {
+			    case efs.ErrCodeBadRequest:
+				    fmt.Println(efs.ErrCodeBadRequest, aerr.Error())
+			    case efs.ErrCodeInternalServerError:
+				    fmt.Println(efs.ErrCodeInternalServerError, aerr.Error())
+		            case efs.ErrCodeFileSystemNotFound:
+				    fmt.Println(efs.ErrCodeFileSystemNotFound, aerr.Error())
+			    case efs.ErrCodeFileSystemInUse:
+			            fmt.Println(efs.ErrCodeFileSystemInUse, aerr.Error())
+			    default:
+				    fmt.Println(aerr.Error())
+			    }
+		    } else {
+			    // Print the error, cast err to awserr.Error to get the Code and
+			    // Message from an error.
+			    fmt.Println(err.Error())
+		    }
+		    return
+    }
+
+    fmt.Println(result)
 }
